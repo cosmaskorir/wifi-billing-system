@@ -1,0 +1,141 @@
+:root {
+    --bg-color: #f3f4f6;
+    --sidebar-bg: #1e293b;
+    --text-white: #ffffff;
+    --accent: #3b82f6;
+}
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: var(--bg-color);
+}
+
+.dashboard-wrapper {
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar Styling */
+.sidebar {
+    width: 250px;
+    background-color: var(--sidebar-bg);
+    color: var(--text-white);
+    display: flex;
+    flex-direction: column;
+}
+
+.brand {
+    padding: 20px;
+    border-bottom: 1px solid #334155;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 20px;
+}
+
+.sidebar ul li a {
+    display: block;
+    padding: 15px 25px;
+    color: #94a3b8;
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.sidebar ul li a:hover, .sidebar ul li a.active {
+    background-color: #334155;
+    color: white;
+    border-left: 4px solid var(--accent);
+}
+
+.logout {
+    margin-top: auto;
+    padding: 20px;
+    border-top: 1px solid #334155;
+}
+
+.logout a {
+    color: #94a3b8;
+    text-decoration: none;
+}
+
+/* Main Content */
+.content {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.status-indicator {
+    background: #dcfce7;
+    color: #166534;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.dot {
+    height: 8px;
+    width: 8px;
+    background-color: #16a34a;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+/* Cards */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+.card h3 {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.card .number {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 10px 0;
+    color: #1e293b;
+}
+
+/* API Box */
+.api-section {
+    margin-top: 40px;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+.link-box p {
+    margin: 10px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.link-box a {
+    color: var(--accent);
+    text-decoration: none;
+}

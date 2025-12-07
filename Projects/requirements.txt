@@ -1,0 +1,10 @@
+Django>=5.0
+djangorestframework
+djangorestframework_simplejwt
+psycopg2-binary
+python-dotenv
+dj_database_url
+requests
+celery
+redis
+django-cors-headers

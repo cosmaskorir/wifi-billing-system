@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISP Admin Dashboard</title>
+    
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+    <div class="dashboard-wrapper">
+        
+        <nav class="sidebar">
+            <div class="brand">
+                <h2><i class="fa-solid fa-wifi"></i> ISP Admin</h2>
+            </div>
+            <ul>
+                <li><a href="#" class="active"><i class="fa-solid fa-home"></i> Overview</a></li>
+                <li><a href="/admin/users/user/"><i class="fa-solid fa-users"></i> Manage Users</a></li>
+                <li><a href="/admin/plans/wifipackage/"><i class="fa-solid fa-tag"></i> WiFi Plans</a></li>
+                <li><a href="/admin/billing/payment/"><i class="fa-solid fa-credit-card"></i> Payments</a></li>
+            </ul>
+            <div class="logout">
+                <a href="/admin/"><i class="fa-solid fa-sign-out-alt"></i> Django Admin</a>
+            </div>
+        </nav>
+
+        <main class="content">
+            <header>
+                <h1>System Overview</h1>
+                <div class="status-indicator">
+                    <span class="dot"></span> System Online
+                </div>
+            </header>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <h3>Active Users</h3>
+                    <p class="number">--</p>
+                    <small>Updated just now</small>
+                </div>
+                <div class="card">
+                    <h3>Revenue (Today)</h3>
+                    <p class="number">KES --</p>
+                    <small> via M-Pesa</small>
+                </div>
+                <div class="card">
+                    <h3>Server Status</h3>
+                    <p class="number" style="color: #10b981;">Healthy</p>
+                    <small>Running on Port 8000</small>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h2>Quick Access Links</h2>
+                <div class="link-box">
+                    <p><strong>Login API:</strong> <a href="/api/auth/login/">/api/auth/login/</a></p>
+                    <p><strong>Register API:</strong> <a href="/api/users/register/">/api/users/register/</a></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+</body>
+</html>
