@@ -1,8 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders login screen', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  
+  // This looks for the "Login" text which should be visible when the app starts
+  // If your App.js says "Customer Portal Login", this will find it.
+  const loginHeader = screen.getByText(/Login/i);
+  
+  expect(loginHeader).toBeInTheDocument();
 });
