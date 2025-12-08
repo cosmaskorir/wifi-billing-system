@@ -1,69 +1,224 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import './App.css'; 
 
 function App() {
   const [token, setToken] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [payments, setPayments] = useState([]);
+  
+  // User Input
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mpesaPhone, setMpesaPhone] = useState('');
+  
+  // UI States
+  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' or 'history'
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ text: '', type: '' });
 
-  // 1. The Login Function
+  // --- API LOGIC (Same as before) ---
   const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
-      // Connects to YOUR Django Backend
-      const res = await axios.post('http://127.0.0.1:8000/api/auth/login/', {
-        username,
-        password
-      });
+      const res = await axios.post('/api/auth/login/', { username, password });
       setToken(res.data.access);
-      fetchSubscription(res.data.access);
+      fetchData(res.data.access);
+      setMessage({ text: '', type: '' });
     } catch (err) {
-      alert("Invalid Credentials");
+      setMessage({ text: 'Invalid Credentials', type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // 2. Fetch Data (Only for this specific user)
-  const fetchSubscription = async (authToken) => {
+  const fetchData = (authToken) => {
+    // 1. Get Subscriptions
+    axios.get('/api/billing/subscriptions/', { headers: { Authorization: `Bearer ${authToken}` } })
+      .then(res => { if (res.data.length > 0) setSubscription(res.data[0]); })
+      .catch(err => console.error(err));
+
+    // 2. Get History
+    axios.get('/api/billing/payments/', { headers: { Authorization: `Bearer ${authToken}` } })
+      .then(res => setPayments(res.data))
+      .catch(err => console.error(err));
+  };
+
+  const handlePayment = async () => {
+    if (!subscription || !mpesaPhone) return;
+    setIsLoading(true);
+    setMessage({ text: 'Initiating STK Push...', type: 'warning' });
+
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/billing/subscriptions/', {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      // Get the first active subscription
-      setSubscription(res.data[0]); 
+      await axios.post('/api/mpesa/pay/', {
+        phone: mpesaPhone,
+        amount: subscription.price 
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setMessage({ text: 'Check your phone for the PIN prompt!', type: 'success' });
     } catch (err) {
-      console.error(err);
+      setMessage({ text: 'Payment Failed to Initiate.', type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // --- LOGIN SCREEN ---
   if (!token) {
     return (
-      <div style={{ padding: '50px', textAlign: 'center' }}>
-        <h2>Customer Portal Login</h2>
-        <form onSubmit={handleLogin}>
-          <input placeholder="Username" onChange={e => setUsername(e.target.value)} /><br/>
-          <input type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} /><br/>
-          <button type="submit">Login</button>
-        </form>
+      <div className="login-container">
+        <div className="login-card">
+          <h2>ISP Customer Portal</h2>
+          <form onSubmit={handleLogin}>
+            <div>
+              <label>Username</label>
+              <input type="text" onChange={e => setUsername(e.target.value)} placeholder="e.g. john_doe" />
+            </div>
+            <div>
+              <label>Password</label>
+              <input type="password" onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+            </div>
+            {message.text && <p style={{color: message.type === 'error' ? 'red' : 'green', textAlign:'center', marginBottom:'10px'}}>{message.text}</p>}
+            <button type="submit" className="btn-primary" disabled={isLoading}>
+              {isLoading ? 'Accessing...' : 'Login to Account'}
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
 
+  // --- MAIN APP LAYOUT ---
   return (
-    <div style={{ padding: '50px', fontFamily: 'Arial' }}>
-      <h1>Welcome, {username}</h1>
-      <hr />
-      
-      {subscription ? (
-        <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '10px' }}>
-          <h3>Your Plan: {subscription.package_name}</h3>
-          <p>Speed: {subscription.speed} Mbps</p>
-          <p>Expires: {new Date(subscription.end_date).toDateString()}</p>
-          <p>Status: <b style={{color: 'green'}}>Active</b></p>
+    <div className="app-layout">
+      {/* 1. SIDEBAR */}
+      <aside className="sidebar">
+        <div className="brand-logo">
+           <span>📡 WiFi Portal</span>
         </div>
-      ) : (
-        <p>You have no active plan. Please pay via M-Pesa.</p>
-      )}
+        
+        <nav className="nav-links">
+          <div 
+            className={`nav-item ${activeView === 'dashboard' ? 'active' : ''}`} 
+            onClick={() => setActiveView('dashboard')}
+          >
+            📊 My Dashboard
+          </div>
+          <div 
+            className={`nav-item ${activeView === 'history' ? 'active' : ''}`} 
+            onClick={() => setActiveView('history')}
+          >
+            💳 Payment History
+          </div>
+        </nav>
+
+        <div className="logout-btn" onClick={() => setToken(null)}>
+          Sign Out
+        </div>
+      </aside>
+
+      {/* 2. MAIN CONTENT */}
+      <main className="main-content">
+        <header className="header">
+          <h1>{activeView === 'dashboard' ? 'Overview' : 'Transaction History'}</h1>
+          <div className="user-info">Logged in as <strong>{username}</strong></div>
+        </header>
+
+        {/* VIEW: DASHBOARD */}
+        {activeView === 'dashboard' && (
+          <>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <h3>Current Plan</h3>
+                <div className="value">{subscription ? subscription.package_name : 'No Plan'}</div>
+                <div style={{marginTop:'10px', color: subscription?.is_active ? 'green' : 'red'}}>
+                  {subscription?.is_active ? '● Online' : '● Inactive'}
+                </div>
+              </div>
+              <div className="stat-card">
+                <h3>Speed Limit</h3>
+                <div className="value">{subscription ? subscription.speed + ' Mbps' : '0 Mbps'}</div>
+              </div>
+              <div className="stat-card">
+                <h3>Renewal Date</h3>
+                <div className="value" style={{fontSize: '1.2rem'}}>
+                  {subscription ? new Date(subscription.end_date).toDateString() : '--'}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Pay Section */}
+            <div className="table-container">
+              <div className="table-header">
+                <h3>Quick Top-Up</h3>
+              </div>
+              <div style={{padding: '2rem', maxWidth: '500px'}}>
+                <p style={{marginBottom: '1rem', color: '#6b7280'}}>
+                  Enter your M-Pesa number below to renew your <b>{subscription?.package_name}</b> plan instantly.
+                </p>
+                <label>M-Pesa Number</label>
+                <input 
+                  type="text" 
+                  placeholder="2547XXXXXXXX" 
+                  value={mpesaPhone}
+                  onChange={e => setMpesaPhone(e.target.value)}
+                />
+                
+                {message.text && (
+                  <div style={{
+                    padding: '10px', 
+                    marginBottom: '15px', 
+                    borderRadius: '6px',
+                    backgroundColor: message.type === 'success' ? '#d1fae5' : '#fee2e2',
+                    color: message.type === 'success' ? '#065f46' : '#991b1b'
+                  }}>
+                    {message.text}
+                  </div>
+                )}
+
+                <button className="btn-primary" onClick={handlePayment} disabled={isLoading || !subscription}>
+                  {isLoading ? 'Processing Payment...' : `Pay KES ${subscription ? subscription.price : '0'} Now`}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* VIEW: HISTORY */}
+        {activeView === 'history' && (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Receipt No</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.length > 0 ? payments.map((pay) => (
+                  <tr key={pay.id}>
+                    <td>{new Date(pay.created_at).toLocaleDateString()}</td>
+                    <td style={{fontFamily: 'monospace'}}>{pay.mpesa_receipt_number || '---'}</td>
+                    <td>KES {pay.amount}</td>
+                    <td>
+                      <span className={`badge ${
+                        pay.status === 'COMPLETED' ? 'badge-success' : 
+                        pay.status === 'PENDING' ? 'badge-warning' : 'badge-danger'
+                      }`}>
+                        {pay.status}
+                      </span>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="4" style={{textAlign:'center', padding:'2rem'}}>No transactions found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
