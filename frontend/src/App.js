@@ -3,28 +3,51 @@ import axios from 'axios';
 import './App.css'; 
 
 function App() {
-  const [token, setToken] = useState(null);
+  // 1. Initialize State from Local Storage (Fixes the refresh issue)
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [username, setUsername] = useState(localStorage.getItem('username') || '');
+  
   const [subscription, setSubscription] = useState(null);
   const [payments, setPayments] = useState([]);
   
-  // User Input
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  // Login Inputs
+  const [inputUsername, setInputUsername] = useState('');
+  const [inputPassword, setInputPassword] = useState('');
+  
+  // Payment Input
   const [mpesaPhone, setMpesaPhone] = useState('');
   
   // UI States
-  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' or 'history'
+  const [activeView, setActiveView] = useState('dashboard'); 
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  // --- API LOGIC (Same as before) ---
+  // 2. Fetch Data Automatically on App Load (if token exists)
+  useEffect(() => {
+    if (token) {
+      fetchData(token);
+    }
+  }, [token]);
+
+  // --- API LOGIC ---
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await axios.post('/api/auth/login/', { username, password });
-      setToken(res.data.access);
-      fetchData(res.data.access);
+      const res = await axios.post('/api/auth/login/', { 
+        username: inputUsername, 
+        password: inputPassword 
+      });
+      
+      const accessToken = res.data.access;
+      
+      // SAVE TO LOCAL STORAGE
+      localStorage.setItem('token', accessToken);
+      localStorage.setItem('username', inputUsername);
+      
+      setToken(accessToken);
+      setUsername(inputUsername);
       setMessage({ text: '', type: '' });
     } catch (err) {
       setMessage({ text: 'Invalid Credentials', type: 'error' });
@@ -33,11 +56,27 @@ function App() {
     }
   };
 
+  const handleLogout = () => {
+    // CLEAR LOCAL STORAGE
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    setToken(null);
+    setUsername('');
+    setSubscription(null);
+    setPayments([]);
+  };
+
   const fetchData = (authToken) => {
     // 1. Get Subscriptions
     axios.get('/api/billing/subscriptions/', { headers: { Authorization: `Bearer ${authToken}` } })
       .then(res => { if (res.data.length > 0) setSubscription(res.data[0]); })
-      .catch(err => console.error(err));
+      .catch(err => {
+        // If token is expired (401), log them out automatically
+        if (err.response && err.response.status === 401) {
+          handleLogout();
+        }
+        console.error(err);
+      });
 
     // 2. Get History
     axios.get('/api/billing/payments/', { headers: { Authorization: `Bearer ${authToken}` } })
@@ -72,11 +111,19 @@ function App() {
           <form onSubmit={handleLogin}>
             <div>
               <label>Username</label>
-              <input type="text" onChange={e => setUsername(e.target.value)} placeholder="e.g. john_doe" />
+              <input 
+                type="text" 
+                onChange={e => setInputUsername(e.target.value)} 
+                placeholder="e.g. john_doe" 
+              />
             </div>
             <div>
               <label>Password</label>
-              <input type="password" onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+              <input 
+                type="password" 
+                onChange={e => setInputPassword(e.target.value)} 
+                placeholder="••••••••" 
+              />
             </div>
             {message.text && <p style={{color: message.type === 'error' ? 'red' : 'green', textAlign:'center', marginBottom:'10px'}}>{message.text}</p>}
             <button type="submit" className="btn-primary" disabled={isLoading}>
@@ -112,7 +159,7 @@ function App() {
           </div>
         </nav>
 
-        <div className="logout-btn" onClick={() => setToken(null)}>
+        <div className="logout-btn" onClick={handleLogout}>
           Sign Out
         </div>
       </aside>
