@@ -6,15 +6,15 @@ from .serializers import SubscriptionSerializer, PaymentSerializer
 from users.models import User
 from plans.models import WifiPackage
 
+# Router Integration
+from routers.models import Router
+from routers.utils import RouterManager
+
 class SubscriptionViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing Subscriptions.
-    """
     serializer_class = SubscriptionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Admins see all subscriptions; Customers see only their own
         if self.request.user.role == 'ADMIN':
             return Subscription.objects.all().order_by('-start_date')
         return Subscription.objects.filter(user=self.request.user).order_by('-start_date')
@@ -22,8 +22,8 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def assign_package(self, request):
         """
-        Custom Endpoint for Admins to manually assign a package.
-        Payload: { "user_id": 1, "package_id": 3 }
+        Manually assign package & Activate Internet on Router
+        Payload: { "user_id": 1, "package_id": 2 }
         """
         user_id = request.data.get('user_id')
         package_id = request.data.get('package_id')
@@ -32,13 +32,27 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
             user = User.objects.get(id=user_id)
             package = WifiPackage.objects.get(id=package_id)
 
-            # Create the subscription (save() logic in model will handle end_date)
+            # 1. DB: Create Subscription (Auto-calculates End Date)
             sub = Subscription.objects.create(
                 user=user,
                 package=package,
                 is_active=True
             )
-            
+
+            # 2. HARDWARE: Connect to MikroTik
+            # (In production, you might select specific routers based on user location)
+            router_db = Router.objects.first()
+            if router_db:
+                try:
+                    manager = RouterManager(router_db)
+                    manager.add_user(
+                        username=user.phone_number, 
+                        password="1234", # Or generate random
+                        profile_speed=package.speed_mbps
+                    )
+                except Exception as e:
+                    print(f"Router Connection Failed: {e}")
+
             return Response(SubscriptionSerializer(sub).data, status=status.HTTP_201_CREATED)
 
         except User.DoesNotExist:
@@ -46,16 +60,11 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
         except WifiPackage.DoesNotExist:
             return Response({"error": "Package not found"}, status=404)
 
-
 class PaymentHistoryViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoint for viewing Payment History.
-    """
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Admins see all payments; Customers see only their own
         if self.request.user.role == 'ADMIN':
             return Payment.objects.all().order_by('-created_at')
         return Payment.objects.filter(user=self.request.user).order_by('-created_at')

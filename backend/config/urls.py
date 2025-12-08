@@ -1,6 +1,10 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect # Import this
+from django.shortcuts import redirect
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 # Function to redirect root URL to dashboard
 def root_redirect(request):
@@ -9,12 +13,15 @@ def root_redirect(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # Add this line at the top to handle the homepage:
+    # Redirect homepage to dashboard
     path('', root_redirect, name='root'),
 
-    # ... your existing API paths ...
-    path('api/auth/', include('rest_framework.urls')), 
-    # (Note: I'm assuming you have the other includes here from previous steps)
+    # --- JWT AUTHENTICATION ENDPOINTS ---
+    # This is the critical fix. It exposes the correct login API for React.
+    path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # --- APP ENDPOINTS ---
     path('api/users/', include('users.urls')),
     path('api/plans/', include('plans.urls')),
     path('api/billing/', include('billing.urls')),
