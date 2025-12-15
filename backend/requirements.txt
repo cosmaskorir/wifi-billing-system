@@ -8,3 +8,4 @@ requests
 celery
 redis
 django-cors-headers
+gunicorn
