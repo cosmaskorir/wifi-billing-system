@@ -1,30 +1,26 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
 
-# Function to redirect root URL to dashboard
-def root_redirect(request):
-    return redirect('/api/dashboard/')
-
 urlpatterns = [
+    # --- Admin Panel ---
     path('admin/', admin.site.urls),
-    
-    # Redirect homepage to dashboard
-    path('', root_redirect, name='root'),
 
-    # --- JWT AUTHENTICATION ENDPOINTS ---
-    # This is the critical fix. It exposes the correct login API for React.
+    # --- Authentication (Login/Refresh) ---
     path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-    # --- APP ENDPOINTS ---
-    path('api/users/', include('users.urls')),
-    path('api/plans/', include('plans.urls')),
-    path('api/billing/', include('billing.urls')),
-    path('api/mpesa/', include('mpesa.urls')),
-    path('api/dashboard/', include('dashboard.urls')),
+    # --- App URLs ---
+    path('api/users/', include('users.urls')),      # Connects to the file above
+    path('api/billing/', include('billing.urls')),  # Your billing app
+    # path('api/routers/', include('routers.urls')), # Uncomment if you have this app
 ]
+
+# Serve static files in development (WhiteNoise handles this in production)
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
