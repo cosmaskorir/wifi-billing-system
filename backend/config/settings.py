@@ -4,8 +4,8 @@ Django settings for ISP Management System.
 from pathlib import Path
 from datetime import timedelta
 import os
-import dj_database_url  # pip install dj-database-url
-from dotenv import load_dotenv  # pip install python-dotenv
+import dj_database_url
+from dotenv import load_dotenv
 
 # 1. Load Environment Variables
 load_dotenv()
@@ -22,7 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-this-in-prod')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+# We default to True for dev, but Render sets this to False automatically
+DEBUG = 'RENDER' not in os.environ
 
 # Allowed Hosts: '*' allows Render/Vercel to host the app
 ALLOWED_HOSTS = ['*']
@@ -106,11 +107,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # 5. DATABASE (Auto-Switching)
 # ==============================================
 
-# Use SQLite locally, but switch to PostgreSQL if DATABASE_URL is found (Neon/Render)
+# Use SQLite locally, but switch to PostgreSQL if DATABASE_URL is found (Render)
 DATABASES = {
     'default': dj_database_url.config(
         default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
-        conn_max_age=600
+        conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
@@ -239,16 +241,19 @@ CELERY_TIMEZONE = TIME_ZONE
 # ==============================================
 # 13. EMAIL CONFIGURATION (Gmail)
 # ==============================================
+# ⚠️ ACTION REQUIRED: REPLACE THESE WITH YOUR REAL DETAILS ⚠️
 
-# Using Gmail's SMTP server
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-# REPLACE THESE WITH YOUR REAL CREDENTIALS
-EMAIL_HOST_USER = 'your-email@gmail.com' 
-EMAIL_HOST_PASSWORD = 'xxxx xxxx xxxx xxxx' # Use an App Password, NOT your login password
+# 1. Your Gmail Address
+EMAIL_HOST_USER = 'your-real-email@gmail.com' 
+
+# 2. Your App Password (NOT your login password)
+# Get this from Google Account -> Security -> 2-Step Verification -> App Passwords
+EMAIL_HOST_PASSWORD = 'xxxx xxxx xxxx xxxx' 
 
 DEFAULT_FROM_EMAIL = f'ISP Support <{EMAIL_HOST_USER}>'
 
