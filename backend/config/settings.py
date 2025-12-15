@@ -249,11 +249,11 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
 # 1. Your Gmail Address
-EMAIL_HOST_USER = 'your-real-email@gmail.com' 
+EMAIL_HOST_USER = 'cosmaskorir514@gmail.com' 
 
 # 2. Your App Password (NOT your login password)
 # Get this from Google Account -> Security -> 2-Step Verification -> App Passwords
-EMAIL_HOST_PASSWORD = 'xxxx xxxx xxxx xxxx' 
+EMAIL_HOST_PASSWORD = 'xxxxxxxxxxxxxxxx' 
 
 DEFAULT_FROM_EMAIL = f'ISP Support <{EMAIL_HOST_USER}>'
 
