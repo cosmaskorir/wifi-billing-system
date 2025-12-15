@@ -2,107 +2,135 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css'; 
 
+// Environment Helper: 
+// Locally, this is empty (uses package.json proxy). 
+// In Production (Vercel), this reads your REACT_APP_API_URL variable.
+const API_URL = process.env.REACT_APP_API_URL || "";
+
 function App() {
-  // 1. Initialize State from Local Storage (Fixes the refresh issue)
+  // --- 1. STATE MANAGEMENT ---
+  
+  // Auth State (Initialize from LocalStorage to persist on refresh)
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [username, setUsername] = useState(localStorage.getItem('username') || '');
-  
+
+  // Data State
   const [subscription, setSubscription] = useState(null);
   const [payments, setPayments] = useState([]);
   
-  // Login Inputs
+  // Input State
   const [inputUsername, setInputUsername] = useState('');
   const [inputPassword, setInputPassword] = useState('');
-  
-  // Payment Input
   const [mpesaPhone, setMpesaPhone] = useState('');
   
-  // UI States
-  const [activeView, setActiveView] = useState('dashboard'); 
+  // UI State
+  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' or 'history'
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  // 2. Fetch Data Automatically on App Load (if token exists)
+  // --- 2. EFFECTS ---
+
+  // Load data whenever the token changes (e.g., on login or refresh)
   useEffect(() => {
     if (token) {
       fetchData(token);
     }
   }, [token]);
 
-  // --- API LOGIC ---
+  // --- 3. API ACTIONS ---
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setMessage({ text: '', type: '' });
+
     try {
-      const res = await axios.post('/api/auth/login/', { 
+      // POST to Django Backend
+      const res = await axios.post(`${API_URL}/api/auth/login/`, { 
         username: inputUsername, 
         password: inputPassword 
       });
       
       const accessToken = res.data.access;
       
-      // SAVE TO LOCAL STORAGE
+      // Save to LocalStorage
       localStorage.setItem('token', accessToken);
       localStorage.setItem('username', inputUsername);
       
+      // Update State
       setToken(accessToken);
       setUsername(inputUsername);
-      setMessage({ text: '', type: '' });
     } catch (err) {
-      setMessage({ text: 'Invalid Credentials', type: 'error' });
+      setMessage({ text: 'Invalid Username or Password', type: 'error' });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleLogout = () => {
-    // CLEAR LOCAL STORAGE
+    // Clear LocalStorage
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    
+    // Reset State
     setToken(null);
     setUsername('');
     setSubscription(null);
     setPayments([]);
+    setInputUsername('');
+    setInputPassword('');
   };
 
   const fetchData = (authToken) => {
-    // 1. Get Subscriptions
-    axios.get('/api/billing/subscriptions/', { headers: { Authorization: `Bearer ${authToken}` } })
-      .then(res => { if (res.data.length > 0) setSubscription(res.data[0]); })
-      .catch(err => {
-        // If token is expired (401), log them out automatically
-        if (err.response && err.response.status === 401) {
-          handleLogout();
-        }
-        console.error(err);
-      });
+    // 1. Fetch Subscription
+    axios.get(`${API_URL}/api/billing/subscriptions/`, { 
+      headers: { Authorization: `Bearer ${authToken}` } 
+    })
+    .then(res => {
+      if (res.data.length > 0) {
+        setSubscription(res.data[0]);
+      }
+    })
+    .catch(err => {
+      // If token is invalid (401), force logout
+      if (err.response && err.response.status === 401) {
+        handleLogout();
+      }
+      console.error(err);
+    });
 
-    // 2. Get History
-    axios.get('/api/billing/payments/', { headers: { Authorization: `Bearer ${authToken}` } })
-      .then(res => setPayments(res.data))
-      .catch(err => console.error(err));
+    // 2. Fetch Payment History
+    axios.get(`${API_URL}/api/billing/payments/`, { 
+      headers: { Authorization: `Bearer ${authToken}` } 
+    })
+    .then(res => setPayments(res.data))
+    .catch(err => console.error(err));
   };
 
   const handlePayment = async () => {
     if (!subscription || !mpesaPhone) return;
+    
     setIsLoading(true);
-    setMessage({ text: 'Initiating STK Push...', type: 'warning' });
+    setMessage({ text: 'Sending STK Push to your phone...', type: 'warning' });
 
     try {
-      await axios.post('/api/mpesa/pay/', {
+      await axios.post(`${API_URL}/api/mpesa/pay/`, {
         phone: mpesaPhone,
         amount: subscription.price 
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      setMessage({ text: 'Check your phone for the PIN prompt!', type: 'success' });
+      }, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      
+      setMessage({ text: 'Success! Check your phone to enter PIN.', type: 'success' });
     } catch (err) {
-      setMessage({ text: 'Payment Failed to Initiate.', type: 'error' });
+      setMessage({ text: 'Payment Failed. Check phone number.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- LOGIN SCREEN ---
+  // --- 4. RENDER: LOGIN SCREEN ---
+  
   if (!token) {
     return (
       <div className="login-container">
@@ -113,6 +141,7 @@ function App() {
               <label>Username</label>
               <input 
                 type="text" 
+                value={inputUsername}
                 onChange={e => setInputUsername(e.target.value)} 
                 placeholder="e.g. john_doe" 
               />
@@ -121,13 +150,24 @@ function App() {
               <label>Password</label>
               <input 
                 type="password" 
+                value={inputPassword}
                 onChange={e => setInputPassword(e.target.value)} 
                 placeholder="••••••••" 
               />
             </div>
-            {message.text && <p style={{color: message.type === 'error' ? 'red' : 'green', textAlign:'center', marginBottom:'10px'}}>{message.text}</p>}
+            
+            {message.text && (
+              <div style={{
+                marginBottom: '15px', 
+                color: message.type === 'error' ? 'red' : 'green', 
+                textAlign: 'center'
+              }}>
+                {message.text}
+              </div>
+            )}
+
             <button type="submit" className="btn-primary" disabled={isLoading}>
-              {isLoading ? 'Accessing...' : 'Login to Account'}
+              {isLoading ? 'Securely Logging in...' : 'Login to Account'}
             </button>
           </form>
         </div>
@@ -135,10 +175,11 @@ function App() {
     );
   }
 
-  // --- MAIN APP LAYOUT ---
+  // --- 5. RENDER: MAIN APP ---
+
   return (
     <div className="app-layout">
-      {/* 1. SIDEBAR */}
+      {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="brand-logo">
            <span>📡 WiFi Portal</span>
@@ -164,26 +205,28 @@ function App() {
         </div>
       </aside>
 
-      {/* 2. MAIN CONTENT */}
+      {/* MAIN CONTENT AREA */}
       <main className="main-content">
         <header className="header">
           <h1>{activeView === 'dashboard' ? 'Overview' : 'Transaction History'}</h1>
-          <div className="user-info">Logged in as <strong>{username}</strong></div>
+          <div className="user-info">
+            Logged in as <strong>{username}</strong>
+          </div>
         </header>
 
-        {/* VIEW: DASHBOARD */}
+        {/* VIEW 1: DASHBOARD */}
         {activeView === 'dashboard' && (
           <>
             <div className="stats-grid">
               <div className="stat-card">
                 <h3>Current Plan</h3>
                 <div className="value">{subscription ? subscription.package_name : 'No Plan'}</div>
-                <div style={{marginTop:'10px', color: subscription?.is_active ? 'green' : 'red'}}>
+                <div style={{marginTop:'10px', color: subscription?.is_active ? 'green' : 'red', fontWeight: 'bold'}}>
                   {subscription?.is_active ? '● Online' : '● Inactive'}
                 </div>
               </div>
               <div className="stat-card">
-                <h3>Speed Limit</h3>
+                <h3>Download Speed</h3>
                 <div className="value">{subscription ? subscription.speed + ' Mbps' : '0 Mbps'}</div>
               </div>
               <div className="stat-card">
@@ -194,7 +237,7 @@ function App() {
               </div>
             </div>
 
-            {/* Quick Pay Section */}
+            {/* QUICK PAY SECTION */}
             <div className="table-container">
               <div className="table-header">
                 <h3>Quick Top-Up</h3>
@@ -203,6 +246,7 @@ function App() {
                 <p style={{marginBottom: '1rem', color: '#6b7280'}}>
                   Enter your M-Pesa number below to renew your <b>{subscription?.package_name}</b> plan instantly.
                 </p>
+                
                 <label>M-Pesa Number</label>
                 <input 
                   type="text" 
@@ -231,7 +275,7 @@ function App() {
           </>
         )}
 
-        {/* VIEW: HISTORY */}
+        {/* VIEW 2: HISTORY */}
         {activeView === 'history' && (
           <div className="table-container">
             <table>
@@ -259,7 +303,11 @@ function App() {
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan="4" style={{textAlign:'center', padding:'2rem'}}>No transactions found.</td></tr>
+                  <tr>
+                    <td colSpan="4" style={{textAlign:'center', padding:'2rem', color: '#6b7280'}}>
+                      No transactions found.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
