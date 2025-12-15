@@ -2,19 +2,22 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css'; 
 
-// Environment Helper
+// Environment Helper (Connects to your Render Backend)
 const API_URL = process.env.REACT_APP_API_URL || "";
 
 function App() {
-  // --- 1. STATE MANAGEMENT ---
+  // ==========================================
+  // 1. STATE MANAGEMENT
+  // ==========================================
   
   // Auth State
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [username, setUsername] = useState(localStorage.getItem('username') || '');
 
   // UI State
-  const [activeView, setActiveView] = useState('dashboard');
-  const [isRegistering, setIsRegistering] = useState(false); // New: Toggle Login/Register
+  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' or 'history'
+  const [isRegistering, setIsRegistering] = useState(false); // Toggle Register Form
+  const [isResetting, setIsResetting] = useState(false);     // Toggle Forgot Password Form (false, true, or 'confirm')
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
@@ -26,24 +29,34 @@ function App() {
   const [inputUsername, setInputUsername] = useState('');
   const [inputPassword, setInputPassword] = useState('');
 
-  // Register Inputs (New)
+  // Register Inputs
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
+
+  // Password Reset Inputs
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   
   // Payment Input
   const [mpesaPhone, setMpesaPhone] = useState('');
 
-  // --- 2. EFFECTS ---
+  // ==========================================
+  // 2. EFFECTS (Load Data on Login)
+  // ==========================================
   useEffect(() => {
     if (token) {
       fetchData(token);
     }
   }, [token]);
 
-  // --- 3. API ACTIONS ---
+  // ==========================================
+  // 3. API ACTIONS
+  // ==========================================
 
+  // --- LOGIN ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -67,7 +80,7 @@ function App() {
     }
   };
 
-  // New: Handle Registration
+  // --- REGISTER ---
   const handleRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -82,16 +95,59 @@ function App() {
       });
       
       setMessage({ text: 'Account created! Please log in.', type: 'success' });
-      setIsRegistering(false); // Switch back to login view
-      setInputUsername(regUsername); // Auto-fill username
+      setIsRegistering(false); // Switch back to login
+      setInputUsername(regUsername);
     } catch (err) {
-      console.error(err);
-      setMessage({ text: 'Registration failed. Username may be taken.', type: 'error' });
+      // Improved Error Handling
+      let errorMsg = "Registration failed.";
+      if (err.response && err.response.data) {
+        if (err.response.data.username) errorMsg = `Username: ${err.response.data.username[0]}`;
+        else if (err.response.data.password) errorMsg = `Password: ${err.response.data.password[0]}`;
+        else if (err.response.data.phone_number) errorMsg = `Phone: ${err.response.data.phone_number[0]}`;
+      }
+      setMessage({ text: errorMsg, type: 'error' });
     } finally {
       setIsLoading(false);
     }
   };
 
+  // --- FORGOT PASSWORD (STEP 1: Request Email) ---
+  const handleRequestReset = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage({ text: 'Sending email...', type: 'warning' });
+    try {
+      // Note: This endpoint comes from django-rest-passwordreset
+      await axios.post(`${API_URL}/api/users/password_reset/`, { email: resetEmail });
+      setMessage({ text: 'Check your email for the reset token!', type: 'success' });
+      setIsResetting('confirm'); // Move to Step 2
+    } catch (err) {
+      setMessage({ text: 'Email not found or error sending.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- FORGOT PASSWORD (STEP 2: Confirm New Password) ---
+  const handleConfirmReset = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/users/password_reset/confirm/`, {
+        token: resetToken,
+        password: newPassword
+      });
+      setMessage({ text: 'Password changed successfully! Please login.', type: 'success' });
+      setIsResetting(false); // Go back to login
+      setInputPassword('');  // Clear old password field
+    } catch (err) {
+      setMessage({ text: 'Invalid Token or Password error.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- LOGOUT ---
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
@@ -101,15 +157,16 @@ function App() {
     setPayments([]);
   };
 
+  // --- FETCH USER DATA ---
   const fetchData = (authToken) => {
-    // Fetch Subscription
+    // 1. Get Subscription Status
     axios.get(`${API_URL}/api/billing/subscriptions/`, { 
       headers: { Authorization: `Bearer ${authToken}` } 
     })
     .then(res => { if (res.data.length > 0) setSubscription(res.data[0]); })
     .catch(err => { if (err.response?.status === 401) handleLogout(); });
 
-    // Fetch History
+    // 2. Get Payment History
     axios.get(`${API_URL}/api/billing/payments/`, { 
       headers: { Authorization: `Bearer ${authToken}` } 
     })
@@ -117,34 +174,41 @@ function App() {
     .catch(console.error);
   };
 
+  // --- MAKE PAYMENT ---
   const handlePayment = async () => {
     if (!subscription || !mpesaPhone) return;
     setIsLoading(true);
-    setMessage({ text: 'Sending STK Push...', type: 'warning' });
+    setMessage({ text: 'Sending STK Push to your phone...', type: 'warning' });
 
     try {
       await axios.post(`${API_URL}/api/mpesa/pay/`, {
         phone: mpesaPhone,
-        amount: subscription.price 
+        amount: subscription.price // Uses the price of their current plan
       }, { headers: { Authorization: `Bearer ${token}` } });
-      setMessage({ text: 'Success! Check your phone.', type: 'success' });
+      setMessage({ text: 'Request sent! Check your phone to complete payment.', type: 'success' });
     } catch (err) {
-      setMessage({ text: 'Payment Failed.', type: 'error' });
+      setMessage({ text: 'Payment Failed. Ensure phone format is 2547...', type: 'error' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- 4. RENDER: AUTH SCREEN (Login / Register) ---
+  // ==========================================
+  // 4. RENDER: AUTH SCREENS
+  // ==========================================
   
   if (!token) {
     return (
       <div className="login-container">
         <div className="login-card">
-          <h2>{isRegistering ? 'Create Account' : 'ISP Customer Portal'}</h2>
+          <h2>
+            {isRegistering ? 'Create Account' : 
+             isResetting === 'confirm' ? 'Set New Password' :
+             isResetting ? 'Reset Password' : 'ISP Customer Portal'}
+          </h2>
           
-          {/* LOGIN FORM */}
-          {!isRegistering ? (
+          {/* --- A. LOGIN FORM --- */}
+          {!isRegistering && !isResetting && (
             <form onSubmit={handleLogin}>
               <div>
                 <label>Username</label>
@@ -161,21 +225,23 @@ function App() {
                 {isLoading ? 'Logging in...' : 'Login to Account'}
               </button>
               
-              <p style={{marginTop: '15px', textAlign: 'center', fontSize: '0.9rem'}}>
-                New user? <span style={{color: '#2563eb', cursor: 'pointer', fontWeight: 'bold'}} onClick={() => {setIsRegistering(true); setMessage({text:'', type:''})}}>Create an account</span>
-              </p>
+              <div style={{marginTop: '15px', textAlign: 'center', fontSize: '0.9rem'}}>
+                <p>New user? <span style={{color: '#2563eb', cursor: 'pointer', fontWeight: 'bold'}} onClick={() => {setIsRegistering(true); setMessage({text:'', type:''})}}>Create an account</span></p>
+                <p style={{marginTop: '5px'}}><span style={{color: '#666', cursor: 'pointer'}} onClick={() => {setIsResetting(true); setMessage({text:'', type:''})}}>Forgot Password?</span></p>
+              </div>
             </form>
-          ) : (
-            
-            /* REGISTER FORM */
+          )}
+
+          {/* --- B. REGISTER FORM --- */}
+          {isRegistering && (
             <form onSubmit={handleRegister}>
               <div>
                 <label>Username</label>
                 <input type="text" onChange={e => setRegUsername(e.target.value)} required />
               </div>
               <div>
-                <label>Email (Optional)</label>
-                <input type="email" onChange={e => setRegEmail(e.target.value)} />
+                <label>Email (Required for receipts)</label>
+                <input type="email" onChange={e => setRegEmail(e.target.value)} required />
               </div>
               <div>
                 <label>Phone Number</label>
@@ -197,15 +263,51 @@ function App() {
               </p>
             </form>
           )}
+
+          {/* --- C. FORGOT PASSWORD (STEP 1) --- */}
+          {isResetting === true && (
+            <form onSubmit={handleRequestReset}>
+              <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '15px'}}>Enter your email address and we will send you a reset token.</p>
+              <div>
+                <label>Email Address</label>
+                <input type="email" onChange={e => setResetEmail(e.target.value)} required />
+              </div>
+              {message.text && <p className={`msg-${message.type}`} style={{color: message.type==='error'?'red':'green', textAlign:'center'}}>{message.text}</p>}
+              
+              <button type="submit" className="btn-primary" disabled={isLoading}>{isLoading ? 'Sending...' : 'Send Reset Token'}</button>
+              <p style={{marginTop:'15px', textAlign:'center', cursor:'pointer', color:'#2563eb'}} onClick={() => setIsResetting(false)}>Back to Login</p>
+            </form>
+          )}
+
+          {/* --- D. FORGOT PASSWORD (STEP 2) --- */}
+          {isResetting === 'confirm' && (
+            <form onSubmit={handleConfirmReset}>
+               <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '15px'}}>Check your email for the token.</p>
+              <div>
+                <label>Reset Token</label>
+                <input type="text" placeholder="e.g. 8f3a..." onChange={e => setResetToken(e.target.value)} required />
+              </div>
+              <div>
+                <label>New Password</label>
+                <input type="password" onChange={e => setNewPassword(e.target.value)} required />
+              </div>
+              {message.text && <p className={`msg-${message.type}`} style={{color: message.type==='error'?'red':'green', textAlign:'center'}}>{message.text}</p>}
+              
+              <button type="submit" className="btn-primary" disabled={isLoading}>{isLoading ? 'Updating...' : 'Set New Password'}</button>
+            </form>
+          )}
+
         </div>
       </div>
     );
   }
 
-  // --- 5. RENDER: MAIN APP ---
-  // (This part remains the same as your previous working version)
+  // ==========================================
+  // 5. RENDER: MAIN DASHBOARD
+  // ==========================================
   return (
     <div className="app-layout">
+      {/* Sidebar */}
       <aside className="sidebar">
         <div className="brand-logo"><span>📡 WiFi Portal</span></div>
         <nav className="nav-links">
@@ -215,12 +317,14 @@ function App() {
         <div className="logout-btn" onClick={handleLogout}>Sign Out</div>
       </aside>
 
+      {/* Main Content */}
       <main className="main-content">
         <header className="header">
           <h1>{activeView === 'dashboard' ? 'Overview' : 'Transaction History'}</h1>
           <div className="user-info">Logged in as <strong>{username}</strong></div>
         </header>
 
+        {/* Dashboard View */}
         {activeView === 'dashboard' && (
           <>
             <div className="stats-grid">
@@ -255,6 +359,7 @@ function App() {
           </>
         )}
 
+        {/* History View */}
         {activeView === 'history' && (
           <div className="table-container">
             <table>
@@ -263,9 +368,18 @@ function App() {
                 {payments.map((pay) => (
                   <tr key={pay.id}>
                     <td>{new Date(pay.created_at).toLocaleDateString()}</td>
-                    <td>{pay.mpesa_receipt_number || '---'}</td>
+                    <td>{pay.transaction_id || pay.mpesa_receipt_number || '---'}</td>
                     <td>KES {pay.amount}</td>
-                    <td>{pay.status}</td>
+                    <td>
+                        <span style={{
+                            padding: '4px 8px', 
+                            borderRadius: '4px', 
+                            backgroundColor: pay.status === 'Completed' ? '#dcfce7' : '#fee2e2',
+                            color: pay.status === 'Completed' ? '#166534' : '#991b1b'
+                        }}>
+                        {pay.status}
+                        </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
