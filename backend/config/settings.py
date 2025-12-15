@@ -7,7 +7,7 @@ import os
 import dj_database_url  # pip install dj-database-url
 from dotenv import load_dotenv  # pip install python-dotenv
 
-# 1. Load Environment Variables from .env file (if it exists)
+# 1. Load Environment Variables
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,7 +25,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-this-in-pro
 # Defaults to True only if not specified in Env
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-# Allowed Hosts (Add your Render URL here later, e.g., 'myapp.onrender.com')
+# Allowed Hosts: '*' allows Render to host the app
 ALLOWED_HOSTS = ['*']
 
 
@@ -35,6 +35,7 @@ ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     # --- Modern Admin Interface (Unfold) ---
+    # MUST be before django.contrib.admin
     "unfold",
     "unfold.contrib.filters",
     "unfold.contrib.forms",
@@ -67,9 +68,13 @@ INSTALLED_APPS = [
 # ==============================================
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # MUST be at the top
     'django.middleware.security.SecurityMiddleware',
+    
+    # --- WhiteNoise: Serves Static Files (CSS/Images) in Production ---
+    'whitenoise.middleware.WhiteNoiseMiddleware', 
+    
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # CORS Must be before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -156,24 +161,29 @@ USE_TZ = True
 
 
 # ==============================================
-# 9. STATIC FILES & CORS
+# 9. STATIC FILES (CSS, JS, Images)
 # ==============================================
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = BASE_DIR / 'staticfiles' # Folder where Render collects files
 
-# CORS: Allow Vercel Frontend and Localhost
-CORS_ALLOW_ALL_ORIGINS = True  # Simplest for avoiding errors during setup
-# If you want strict security, comment out the line above and use this:
+# WhiteNoise Storage: Compresses and caches static files for speed
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+
+# ==============================================
+# 10. CORS (Frontend Access)
+# ==============================================
+
+CORS_ALLOW_ALL_ORIGINS = True 
+# For stricter security in the future, list your Vercel domain:
 # CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
 #     "https://your-frontend-app.vercel.app",
 # ]
 
 
 # ==============================================
-# 10. MODERN ADMIN CONFIG (Django-Unfold)
+# 11. MODERN ADMIN CONFIG (Django-Unfold)
 # ==============================================
 
 UNFOLD = {
@@ -215,7 +225,7 @@ UNFOLD = {
 
 
 # ==============================================
-# 11. M-PESA & CELERY CONFIG
+# 12. M-PESA & CELERY CONFIG
 # ==============================================
 
 # M-Pesa (Safaricom Daraja)
