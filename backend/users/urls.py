@@ -2,16 +2,14 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet, RegisterView
 
-app_name = 'users'
-
-# Create a router and register our viewsets with it.
 router = DefaultRouter()
-router.register(r'user', UserViewSet)  # This creates /api/users/user/
+router.register(r'user', UserViewSet)
 
 urlpatterns = [
-    # Public Endpoint: Customers use this to sign up
     path('register/', RegisterView.as_view(), name='register'),
-
-    # Admin Endpoints: Router handles /user/ listing and editing
+    
+    # Add this line for password reset:
+    path('password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
+    
     path('', include(router.urls)),
 ]

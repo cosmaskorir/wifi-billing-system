@@ -22,10 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-this-in-prod')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Defaults to True only if not specified in Env
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-# Allowed Hosts: '*' allows Render to host the app
+# Allowed Hosts: '*' allows Render/Vercel to host the app
 ALLOWED_HOSTS = ['*']
 
 
@@ -35,7 +34,6 @@ ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     # --- Modern Admin Interface (Unfold) ---
-    # MUST be before django.contrib.admin
     "unfold",
     "unfold.contrib.filters",
     "unfold.contrib.forms",
@@ -51,7 +49,8 @@ INSTALLED_APPS = [
     # --- Third-Party Libraries ---
     'rest_framework',
     'rest_framework_simplejwt',
-    'corsheaders',  # Handles React <-> Django communication
+    'corsheaders',               # Handles React <-> Django communication
+    'django_rest_passwordreset', # Handles Forgot Password logic
 
     # --- Local Project Apps ---
     'users.apps.UsersConfig',
@@ -74,7 +73,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware', 
     
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware', # CORS Must be before CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware', # Must be before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -176,10 +175,6 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # ==============================================
 
 CORS_ALLOW_ALL_ORIGINS = True 
-# For stricter security in the future, list your Vercel domain:
-# CORS_ALLOWED_ORIGINS = [
-#     "https://your-frontend-app.vercel.app",
-# ]
 
 
 # ==============================================
@@ -239,5 +234,22 @@ MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 CELERY_TIMEZONE = TIME_ZONE
+
+
+# ==============================================
+# 13. EMAIL CONFIGURATION (Gmail)
+# ==============================================
+
+# Using Gmail's SMTP server
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# REPLACE THESE WITH YOUR REAL CREDENTIALS
+EMAIL_HOST_USER = 'your-email@gmail.com' 
+EMAIL_HOST_PASSWORD = 'xxxx xxxx xxxx xxxx' # Use an App Password, NOT your login password
+
+DEFAULT_FROM_EMAIL = f'ISP Support <{EMAIL_HOST_USER}>'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

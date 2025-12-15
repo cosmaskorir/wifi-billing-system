@@ -5,6 +5,9 @@ class UsersConfig(AppConfig):
     name = 'users'
 
     def ready(self):
-        # Import signals here to ensure they are registered when the app starts
-        # import users.signals 
-        pass
+        """
+        This method runs when Django starts.
+        We import the signals module here to ensure the Password Reset
+        and Email logic is registered and listening for events.
+        """
+        import users.signals
