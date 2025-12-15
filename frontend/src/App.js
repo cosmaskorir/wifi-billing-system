@@ -3,7 +3,8 @@ import axios from 'axios';
 import './App.css'; 
 
 // Environment Helper (Connects to your Render Backend)
-const API_URL = process.env.REACT_APP_API_URL || "";
+// If running locally, this uses http://127.0.0.1:8000
+const API_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
 
 function App() {
   // ==========================================
@@ -122,7 +123,23 @@ function App() {
       setMessage({ text: 'Check your email for the reset token!', type: 'success' });
       setIsResetting('confirm'); // Move to Step 2
     } catch (err) {
-      setMessage({ text: 'Email not found or error sending.', type: 'error' });
+      console.error("Reset Error:", err);
+      // DEBUG: Show exact error from server
+      let errorMsg = "Email not found or server error.";
+      if (err.response && err.response.data) {
+          // Sometimes the error is an object { email: ["..."] }
+          if (err.response.data.email) {
+              errorMsg = err.response.data.email[0];
+          } 
+          // Sometimes it is just a detail message
+          else if (err.response.data.detail) {
+              errorMsg = err.response.data.detail;
+          }
+      }
+      if (err.response && err.response.status === 500) {
+          errorMsg = "Server Error (500). Check Backend Logs (Email Settings might be wrong).";
+      }
+      setMessage({ text: errorMsg, type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +158,11 @@ function App() {
       setIsResetting(false); // Go back to login
       setInputPassword('');  // Clear old password field
     } catch (err) {
-      setMessage({ text: 'Invalid Token or Password error.', type: 'error' });
+      let errorMsg = "Invalid Token or Password error.";
+      if (err.response && err.response.data && err.response.data.password) {
+          errorMsg = err.response.data.password[0];
+      }
+      setMessage({ text: errorMsg, type: 'error' });
     } finally {
       setIsLoading(false);
     }
