@@ -1,60 +1,74 @@
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
+from .models import User 
+from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError
+import re # Import the regular expression module
+from django.db import IntegrityError
 
-# Get the custom user model defined in settings.AUTH_USER_MODEL
-User = get_user_model()
-
-class RegisterSerializer(serializers.ModelSerializer):
-    """
-    Serializer for registering a new customer.
-    Enforces password validation and hashing.
-    """
-    password = serializers.CharField(
-        write_only=True, 
-        required=True, 
-        validators=[validate_password],
-        style={'input_type': 'password'}
-    )
-    password_confirm = serializers.CharField(
-        write_only=True, 
-        required=True,
-        style={'input_type': 'password'}
-    )
-
+# --- 1. Registration Serializer ---
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    
     class Meta:
         model = User
-        fields = ('username', 'email', 'phone_number', 'password', 'password_confirm', 'location')
+        fields = ('username', 'email', 'phone_number', 'password')
         extra_kwargs = {
-            'email': {'required': True}
+            'username': {'required': True},
+            'email': {'required': True},
+            'phone_number': {'required': True},
         }
 
-    def validate(self, attrs):
-        # Check if passwords match
-        if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError({"password": "Password fields didn't match."})
-        return attrs
+    def validate_phone_number(self, value):
+        # 1. Strip spaces and non-digit characters for cleaning
+        clean_number = re.sub(r'\D', '', value)
+
+        # 2. Enforce 254 format:
+        if clean_number.startswith('0'):
+            # Change 07... to 2547...
+            clean_number = '254' + clean_number[1:]
+        
+        # 3. Check if the final number matches the expected international length and format
+        if not re.match(r'^2547\d{8}$', clean_number):
+            raise serializers.ValidationError(
+                "Phone number must be a valid Kenyan mobile number in the format 2547xxxxxxx or 07xxxxxxxxx."
+            )
+        
+        # 4. Check for uniqueness before passing to the model save
+        if User.objects.filter(phone_number=clean_number).exists():
+             raise serializers.ValidationError(
+                "This phone number is already registered."
+            )
+
+        return clean_number
+
+    def validate_password(self, value):
+        try:
+            password_validation.validate_password(value, self.instance)
+        except ValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value
 
     def create(self, validated_data):
-        # Remove password_confirm as it's not a model field
-        validated_data.pop('password_confirm')
-        
-        # specific logic to handle password hashing
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email'),
-            phone_number=validated_data['phone_number'],
-            location=validated_data.get('location', ''),
-            password=validated_data['password']
-        )
-        return user
+        # Use .create_user to ensure the password is hashed correctly
+        try:
+            user = User.objects.create_user(
+                username=validated_data['username'],
+                email=validated_data['email'],
+                phone_number=validated_data['phone_number'], 
+                password=validated_data['password']
+            )
+            return user
+        except IntegrityError:
+             # Should be caught by validate_phone_number, but kept for robustness
+             raise serializers.ValidationError({"phone_number": "This phone number is already registered."})
 
-
+# --- 2. User/Profile Detail Serializer (The missing part) ---
 class UserSerializer(serializers.ModelSerializer):
     """
-    Serializer for viewing user profiles.
+    Serializer used for displaying or updating user profile details (e.g., in /api/auth/me/).
     """
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'phone_number', 'role', 'location', 'date_joined')
-        read_only_fields = ('id', 'role', 'date_joined')
+        # Include all necessary fields, excluding the password
+        fields = ('id', 'username', 'email', 'phone_number', 'first_name', 'last_name', 'is_active')
+        read_only_fields = ('username', 'is_active')

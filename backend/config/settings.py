@@ -1,45 +1,29 @@
-"""
-Django settings for ISP Management System.
-"""
+import os
 from pathlib import Path
 from datetime import timedelta
-import os
-import dj_database_url
-from dotenv import load_dotenv
-
-# 1. Load Environment Variables
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# ==============================================
-# 2. CORE SECURITY SETTINGS
-# ==============================================
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-this-in-prod')
+# REPLACE WITH YOUR ACTUAL KEY
+SECRET_KEY = 'django-insecure-@1t3-h@#h2r&y%7_8m0m-0c8-!k^2q*n#^t!&i3!z+p28p#0v9'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# We default to True for dev, but Render sets this to False automatically
-DEBUG = 'RENDER' not in os.environ
+DEBUG = True
 
-# Allowed Hosts: '*' allows Render/Vercel to host the app
-ALLOWED_HOSTS = ['*']
+# Add your local and production domain names here
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
-# ==============================================
-# 3. INSTALLED APPS
-# ==============================================
+# Application definition
 
 INSTALLED_APPS = [
-    # --- Modern Admin Interface (Unfold) ---
-    "unfold",
-    "unfold.contrib.filters",
-    "unfold.contrib.forms",
-
-    # --- Standard Django Apps ---
+    # --- UNFOLD THEME (Must be first!) ---
+    'unfold',
+    
+    # Core Django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -47,34 +31,25 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # --- Third-Party Libraries ---
+    # Third-Party Apps
     'rest_framework',
-    'rest_framework_simplejwt',
-    'corsheaders',               # Handles React <-> Django communication
-    'django_rest_passwordreset', # Handles Forgot Password logic
+    'rest_framework_simplejwt', 
+    'corsheaders',              
+    'django_rest_passwordreset', # FIX: Added this for password reset functionality
 
-    # --- Local Project Apps ---
+    # Local Apps
     'users.apps.UsersConfig',
     'plans.apps.PlansConfig',
     'billing.apps.BillingConfig',
     'mpesa.apps.MpesaConfig',
-    'dashboard.apps.DashboardConfig',
-    'routers.apps.RoutersConfig'
+    'routers.apps.RoutersConfig',
+    'support.apps.SupportConfig',
 ]
-
-
-# ==============================================
-# 4. MIDDLEWARE
-# ==============================================
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    
-    # --- WhiteNoise: Serves Static Files (CSS/Images) in Production ---
-    'whitenoise.middleware.WhiteNoiseMiddleware', 
-    
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware', # Must be before CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -87,7 +62,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [], 
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -103,37 +78,86 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# ==============================================
-# 5. DATABASE (Auto-Switching)
-# ==============================================
-
-# Use SQLite locally, but switch to PostgreSQL if DATABASE_URL is found (Render)
+# Database
 DATABASES = {
-    'default': dj_database_url.config(
-        default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 
-# ==============================================
-# 6. AUTHENTICATION & USER MODEL
-# ==============================================
-
-AUTH_USER_MODEL = 'users.User'
-
+# Password validation (default)
 AUTH_PASSWORD_VALIDATORS = [
-    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
 ]
 
 
-# ==============================================
-# 7. API & JWT SETTINGS
-# ==============================================
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'Africa/Nairobi'
+USE_I18N = True
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = 'static/'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Custom User Model
+AUTH_USER_MODEL = 'users.User'
+
+
+# ====================================================================
+# --- UNFOLD THEME CONFIGURATION (For Admin Sidebar) ---
+# ====================================================================
+
+UNFOLD = {
+    "SITE_TITLE": "ISP Customer Portal Admin",
+    "SITE_HEADER": "ISP Network Control",
+    
+    # Points to the custom grouping logic we created in unfold_callbacks.py
+    "DASHBOARD_CALLBACK": "config.unfold_callbacks.custom_dashboard_callback", 
+    
+    # Defines the order of groups on the sidebar
+    "EXTENSIONS": {
+        "model_admin": {
+            "ordering": (
+                "BILLING", 
+                "SUPPORT", 
+                "NETWORK",
+                "AUTHENTICATION_AND_AUTHORIZATION",
+                "ROUTERS", 
+            )
+        }
+    }
+}
+
+# ====================================================================
+# --- CORS & CSRF SECURITY FIXES ---
+# ====================================================================
+
+# 1. CORS Allowed Origins (Must include the URL where your React app is running)
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+CORS_ALLOW_ALL_ORIGINS = False 
+
+# 2. CSRF Trusted Origins (Required for POST/PUT requests from the frontend)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# ====================================================================
+# --- REST FRAMEWORK / JWT SETTINGS ---
+# ====================================================================
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -141,120 +165,47 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
-    ),
+    )
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
+# ====================================================================
+# --- MPESA CONFIGURATION ---
+# ====================================================================
 
-# ==============================================
-# 8. INTERNATIONALIZATION
-# ==============================================
-
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Africa/Nairobi'
-USE_I18N = True
-USE_TZ = True
-
-
-# ==============================================
-# 9. STATIC FILES (CSS, JS, Images)
-# ==============================================
-
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles' # Folder where Render collects files
-
-# WhiteNoise Storage: Compresses and caches static files for speed
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Replace these placeholder values with your actual Safaricom/Daraja API credentials
+MPESA_CONSUMER_KEY = os.environ.get('MPESA_CONSUMER_KEY', 'your_consumer_key')
+MPESA_CONSUMER_SECRET = os.environ.get('MPESA_CONSUMER_SECRET', 'your_consumer_secret')
+MPESA_SHORTCODE = os.environ.get('MPESA_SHORTCODE', '174379')
+MPESA_PASSKEY = os.environ.get('MPESA_PASSKEY', 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919') 
+MPESA_CALLBACK_URL = os.environ.get('MPESA_CALLBACK_URL', 'https://your-public-ngrok-url/api/mpesa/callback/') 
 
 
-# ==============================================
-# 10. CORS (Frontend Access)
-# ==============================================
+# ====================================================================
+# --- AFRICA'S TALKING SMS CONFIGURATION (Optional) ---
+# ====================================================================
 
-CORS_ALLOW_ALL_ORIGINS = True 
+AT_USERNAME = os.environ.get('AT_USERNAME', 'sandbox') 
+AT_API_KEY = os.environ.get('AT_API_KEY', 'YOUR_AFRICAS_TALKING_API_KEY') 
+AT_SENDER_ID = os.environ.get('AT_SENDER_ID', 'AFRICASTKNG') 
 
+# ====================================================================
+# --- EMAIL SETTINGS (For Password Reset) ---
+# ====================================================================
 
-# ==============================================
-# 11. MODERN ADMIN CONFIG (Django-Unfold)
-# ==============================================
-
-UNFOLD = {
-    "SITE_TITLE": "ISP Management",
-    "SITE_HEADER": "WiFi Admin Dashboard",
-    "SIDEBAR": {
-        "show_search": True,
-        "show_all_applications": True,
-        "navigation": [
-            {
-                "title": "Main Management",
-                "separator": True,
-                "items": [
-                    {
-                        "title": "Users & Customers",
-                        "icon": "people",
-                        "link": "/admin/users/user/",
-                    },
-                    {
-                        "title": "WiFi Packages",
-                        "icon": "router",
-                        "link": "/admin/plans/wifipackage/",
-                    },
-                    {
-                        "title": "Subscriptions",
-                        "icon": "subscriptions",
-                        "link": "/admin/billing/subscription/",
-                    },
-                    {
-                        "title": "Payments",
-                        "icon": "attach_money",
-                        "link": "/admin/billing/payment/",
-                    },
-                ],
-            },
-        ],
-    },
-}
-
-
-# ==============================================
-# 12. M-PESA & CELERY CONFIG
-# ==============================================
-
-# M-Pesa (Safaricom Daraja)
-MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
-MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
-MPESA_PASSKEY = os.getenv('MPESA_PASSKEY')
-MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE', '174379')
-MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
-
-# Celery (Background Tasks - Redis)
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-CELERY_TIMEZONE = TIME_ZONE
-
-
-# ==============================================
-# 13. EMAIL CONFIGURATION (Gmail)
-# ==============================================
-# ⚠️ ACTION REQUIRED: REPLACE THESE WITH YOUR REAL DETAILS ⚠️
-
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-
-# 1. Your Gmail Address
-EMAIL_HOST_USER = 'cosmaskorir514@gmail.com' 
-
-# 2. Your App Password (NOT your login password)
-# Get this from Google Account -> Security -> 2-Step Verification -> App Passwords
-EMAIL_HOST_PASSWORD = 'xxxxxxxxxxxxxxxx' 
-
-DEFAULT_FROM_EMAIL = f'ISP Support <{EMAIL_HOST_USER}>'
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# Use console backend for development (prints email to terminal)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

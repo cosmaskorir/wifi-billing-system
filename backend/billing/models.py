@@ -1,52 +1,44 @@
 from django.db import models
 from django.conf import settings
-from plans.models import WifiPackage
-from django.utils import timezone
-from datetime import timedelta
-
-class Subscription(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    package = models.ForeignKey(WifiPackage, on_delete=models.SET_NULL, null=True)
-    
-    # We use timezone.now so we can edit the start date if needed
-    start_date = models.DateTimeField(default=timezone.now)
-    
-    # Allowed to be blank because we auto-calculate it
-    end_date = models.DateTimeField(blank=True, null=True)
-    
-    is_active = models.BooleanField(default=True)
-
-    def save(self, *args, **kwargs):
-        # Logic: If end_date is empty, calculate it based on the package cycle
-        if not self.end_date and self.package:
-            if self.package.billing_cycle == 'DAILY':
-                self.end_date = self.start_date + timedelta(days=1)
-            elif self.package.billing_cycle == 'WEEKLY':
-                self.end_date = self.start_date + timedelta(weeks=1)
-            elif self.package.billing_cycle == 'MONTHLY':
-                self.end_date = self.start_date + timedelta(days=30)
-        
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.user} - {self.package}"
+from plans.models import WiFiPackage # Corrected capitalization
 
 class Payment(models.Model):
     STATUS_CHOICES = (
-        ('PENDING', 'Pending'),
-        ('COMPLETED', 'Completed'),
-        ('FAILED', 'Failed')
+        ('Pending', 'Pending'),
+        ('Completed', 'Completed'),
+        ('Failed', 'Failed'),
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    # M-Pesa specific fields
-    checkout_request_id = models.CharField(max_length=100, unique=True) 
+    transaction_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
     mpesa_receipt_number = models.CharField(max_length=50, blank=True, null=True)
     phone_number = models.CharField(max_length=15)
-    
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    payment_method = models.CharField(max_length=50, default='M-Pesa')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.phone_number} - {self.amount}"
+        return f"{self.user.username} - {self.amount} ({self.status})"
+
+class Subscription(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='subscription')
+    package = models.ForeignKey(WiFiPackage, on_delete=models.SET_NULL, null=True)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    is_active = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.package.name}"
+
+class DataUsage(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='data_usage')
+    date = models.DateField(auto_now_add=True)
+    download_mb = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    upload_mb = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ('user', 'date')
+
+    def __str__(self):
+        return f"Usage for {self.user.username} on {self.date}"

@@ -1,55 +1,40 @@
 from rest_framework import serializers
-from .models import Subscription, Payment
-from plans.models import WifiPackage
-from users.serializers import UserSerializer  # Optional: if you want full user details
+from .models import Subscription, Payment, DataUsage
+from plans.models import WiFiPackage
 
-class PaymentSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-
-    class Meta:
-        model = Payment
-        fields = [
-            'id', 
-            'user', 
-            'username', 
-            'amount', 
-            'phone_number', 
-            'mpesa_receipt_number', 
-            'status', 
-            'created_at'
-        ]
-        read_only_fields = ['status', 'mpesa_receipt_number', 'checkout_request_id', 'created_at']
-
-
+# --- 1. Subscription Serializer (Used for display in App.js) ---
 class SubscriptionSerializer(serializers.ModelSerializer):
-    # Flatten package details so the frontend gets "package_name" and "speed" directly
     package_name = serializers.CharField(source='package.name', read_only=True)
-    speed = serializers.IntegerField(source='package.speed_mbps', read_only=True)
-    price = serializers.DecimalField(source='package.price', max_digits=10, decimal_places=2, read_only=True)
+    price = serializers.DecimalField(source='package.price', max_digits=8, decimal_places=2, read_only=True)
     
-    # Calculate days remaining dynamically
-    days_remaining = serializers.SerializerMethodField()
-
     class Meta:
         model = Subscription
-        fields = [
-            'id', 
-            'user', 
-            'package',          # The ID (for writing/selecting)
-            'package_name',     # Read-only detail
-            'speed',            # Read-only detail
-            'price',            # Read-only detail
-            'start_date', 
-            'end_date', 
-            'is_active',
-            'days_remaining'
-        ]
-        read_only_fields = ['start_date', 'end_date', 'is_active']
+        fields = ['id', 'user', 'package', 'package_name', 'price', 'start_date', 'end_date', 'is_active', 'status', 'created_at']
+        read_only_fields = ['user', 'package', 'start_date', 'end_date', 'is_active', 'status']
 
-    def get_days_remaining(self, obj):
-        from django.utils import timezone
-        now = timezone.now()
-        if obj.end_date and obj.end_date > now:
-            delta = obj.end_date - now
-            return delta.days
-        return 0
+# --- 2. Payment Serializer ---
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
+# --- 3. Data Usage Serializer (For display on graph) ---
+class DataUsageSerializer(serializers.ModelSerializer):
+    # Field to format the date nicely for the frontend graph
+    date = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DataUsage
+        fields = ['date', 'download', 'upload']
+        
+    def get_date(self, obj):
+        # Format the date as 'YYYY-MM-DD' for the frontend graph
+        return obj.date.strftime('%Y-%m-%d')
+
+
+# --- 4. NEW: Plan Action Serializer ---
+class PlanActionSerializer(serializers.Serializer):
+    """
+    Used to validate the package ID for upgrade/downgrade/renewal requests.
+    """
+    package_id = serializers.IntegerField()

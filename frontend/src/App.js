@@ -1,3 +1,4 @@
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css'; 
@@ -43,6 +44,9 @@ function App() {
   
   // Payment Input
   const [mpesaPhone, setMpesaPhone] = useState('');
+
+  const [usageData, setUsageData] = useState([]);
+  const [liveUsage, setLiveUsage] = useState({ upload_mb: 0, download_mb: 0 });
 
   // ==========================================
   // 2. EFFECTS (Load Data on Login)

@@ -1,15 +1,20 @@
-from rest_framework import serializers
-from .models import WifiPackage
+# backend/plans/serializers.py
 
-class WifiPackageSerializer(serializers.ModelSerializer):
+from rest_framework import serializers
+from .models import WiFiPackage
+
+class WiFiPackageSerializer(serializers.ModelSerializer):
+    """
+    Serializer for exposing WiFi package details to the customer portal.
+    """
     class Meta:
-        model = WifiPackage
+        model = WiFiPackage
         fields = [
             'id', 
             'name', 
-            'speed_mbps', 
             'price', 
-            'billing_cycle', 
-            'description',  # Assuming you added this field, if not remove it
-            'is_active'
+            'duration_days', 
+            'max_download_speed', 
+            'max_upload_speed', 
+            'data_cap_mb'
         ]
